@@ -1,0 +1,369 @@
+---
+title: "Post hoc Power is Not Informative"
+author: "Daniel E. Weeks and Lacey W. Heinsberg"
+date: "`r format(Sys.time(), '%B %d, %Y, %R')`"
+header-includes:
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    toc_depth: 3
+  html_document:
+    df_print: paged
+    toc: true
+    number_sections: true
+    toc_depth: '3'
+    code_folding: show
+#   md_extensions: +raw_attribute
+---
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+require(knitr)
+# Set so that long lines in R will be wrapped:
+opts_chunk$set(tidy.opts=list(width.cutoff=80),tidy=TRUE)
+```
+
+```{r,echo=FALSE}
+# In the event of a crash, save the working space on exit:
+save_all <- function() {
+  save.image("recover.RData")
+}
+options(error = save_all)
+```
+
+# Load Libraries
+
+```{r load_libraries,message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidylog)
+library(broom)
+library(pander)
+library(powerMediation)
+library(ggplot2)
+library(grateful)
+```
+
+# Scenario
+
+Suppose two scientific groups, one at University A and one at University B, are serendipitously and simultaneously working on essentially identical research experiments, using genetically identical mice (n=100) being fed the same diet. The purpose of their experiments is to determine the association between a two-allele genetic marker G (minor allele frequency=0.5) and a quantitative trait Y. Both groups use simple linear regression (i.e., Y ~ G) and a significance threshold of 0.05. 
+
+## Simulation set up
+
+1. Number of mice: 100 mice measured for a quantitative trait Y
+2. Risk factor: a two-allele genetic marker, G, with a minor allele frequency of 0.5
+3. True Effect size: To be revealed later
+4. Significance threshold: 0.05
+5. Statistical Test: simple linear regression of the quantitative trait Y on the genetic marker G (i.e., Y ~ G) 
+
+```{r setUp}
+# Number of mice
+n <- 100
+# Minor allele frequency
+q <- 0.50
+p <- 1 - q
+# Significance threshold
+T <- 0.05
+# Number of replicates in our simulation
+nreps <- 1000
+set.seed(seed = 26392021)
+```
+
+## Predicted statistical power 
+
+The groups submit grant applications to obtain funding for their research. Within the applications are their power calculations estimating a power curve using an analytical approach, using the `power.SLR` function from the `powerMediation` R package.
+
+```{r predicted_statistical_power}
+# Hypothesized standard deviation of x (G) and y (Y)
+sigma.x <- 0.74
+sigma.y <- 1.0
+# Significance level 
+alpha <- 0.05
+# Range of potential effect sizes
+beta <- seq(0.1,0.5,by = 0.001)
+# Create power table
+power.table <- tibble(beta=beta, power = NA)
+power.table$power <- as.numeric(power.table$power)
+for (i in 1:length(beta)) {
+  power.table[i,"beta"] <- beta[i]
+  power.table[i,"power"] <- power.SLR(n = n, lambda.a = beta[i], sigma.x = sigma.x, sigma.y = sigma.y, alpha = alpha, verbose = FALSE )$power
+}
+power.table
+# Determine the minimum effect size that can be detected with the given study design
+p.80 <- minEffect.SLR(n=n, power=0.8, sigma.x=sigma.x, sigma.y=sigma.y, alpha=0.05, verbose=FALSE)$lambda.a
+p.80 <- round(p.80, 3)
+# Plot power curve
+ggplot(data=power.table, aes(x=beta, y=power)) + geom_line() +  xlab("Effect Size") + ylab("Power") +   geom_vline(xintercept = p.80, color = "black", linetype="dotted") + annotate("text", x=p.80 + 0.02, y=0.55, label=p.80, size=5) + ggtitle("Predicted statistical power curve for experiments at Universities A and B.") 
+```
+
+*The above figure corresponds to Figure 1 in the manuscript. The black solid line represents analytically-derived estimates of predicted pre-study power as a function of assumed effect size while the black dotted line indicates the minimum effect size the study has 80% predicted power to detect.*
+
+Based on these power calculations, if the standard deviation of the predictor G is assumed to be `r sigma.x` and the marginal standard deviation of the outcome, the trait Y, is assumed to be `r sigma.y`, then by carrying out a two-sided simple linear regression test at the `r alpha` significance level, regressing outcome Y on predictor G, the estimated power graph is created (using the `power.SLR` function from the `powerMediation` R package). The groups determine they have 80% predicted power to detect an effect size of `r p.80` or greater. 
+
+The groups receive funding for their work (Woo hoo!) and carry out their experiments. 
+
+## Run simulation 
+
+The following code simulates 1000 possible observations at University A and 1000 possible observations at University B using true *a priori* effect sizes for each  model (to be revealed later), genotype distributions simulated under Hardy-Weinberg equilirbium (HWE, see below), and an error term from a standard normal distribution to indicate uncertainty in the model (i.e., Y ~ True_Effect*G + E). 
+
+### University A
+
+```{r genotype_A}
+# Define expected genotype distribution under HWE
+f <- c(p*p, 2*p*q, q*q)
+# Simulate genotype data
+G <- sample(c(0,1,2), size = n, replace = TRUE, prob = f)
+# Genotype distribution
+pander(addmargins(table(G)), "Distribution of genotypes at University A")
+```
+
+```{r effect_A, echo=FALSE}
+# Set a priori true genotype effect size 
+true_betaA <- 0.402 ## True effect, University A 
+```
+
+```{r results_A}
+# Set up table to store results of simulation 
+results <- tibble(i=seq(1,nreps),pval=NA,term=NA,estimate=NA,std.error=NA,ci_low=NA,ci_high=NA,statistic=NA)
+results$pval <- as.numeric(results$pval)
+results$term <- as.character(results$term)
+results$estimate <- as.numeric(results$estimate)
+results$std.error <- as.numeric(results$std.error)
+results$ci_low <- as.numeric(results$ci_low)
+results$ci_high <- as.numeric(results$ci_high)
+results$statistic <- as.numeric(results$statistic)
+
+# Generate results across 1000 simulations
+for (i in 1:nreps) {
+  Y <- true_betaA*G + rnorm(n) 
+  mod <- lm(Y ~ G)
+  results[i, "pval"] <- tidy(mod)[2, "p.value"]
+  results[i, "term"] <- tidy(mod)[2, "term"]
+  results[i, "estimate"] <- tidy(mod)[2, "estimate"]
+  results[i, "std.error"] <- tidy(mod)[2, "std.error"]
+  results[i, "ci_low"] <- tidy(mod, conf.int = 0.95)[2, "conf.low"]
+  results[i, "ci_high"] <- tidy(mod, conf.int = 0.95)[2, "conf.high"]
+  results[i, "statistic"] <- tidy(mod)[2, "statistic"]
+}
+
+# Calculate the simulation-derived 'true power' by dividing the number of significant results by total results (number of simulations)
+true_powerA <- sum(results$pval < T)/sum(!is.na(results$pval))
+
+# Let's say that the research group observed a p-value of about 0.052
+# Select this observation from the distribution of simulated results
+p_approx <- 0.052
+expA <- results %>% filter(pval<=p_approx & pval>p_approx-0.001) %>% arrange(desc(pval)) %>%  head(1)
+pander(expA, "Results of experiment at University A") 
+```
+
+### University B
+
+```{r genotype_B}
+# Repeat the steps taken above for University B
+f <- c(p*p, 2*p*q, q*q)
+G <- sample(c(0,1,2), size = n, replace = TRUE, prob = f)
+pander(addmargins(table(G)), "Distribution of genotypes at University B")
+```
+
+```{r effect_B, echo=FALSE}
+true_betaB <- 0.201 ## True effect, University B 
+```
+
+```{r results_B}
+results <- tibble(i=seq(1,nreps),pval=NA,term=NA,estimate=NA,std.error=NA,ci_low=NA,ci_high=NA,statistic=NA)
+results$pval <- as.numeric(results$pval)
+results$term <- as.character(results$term)
+results$estimate <- as.numeric(results$estimate)
+results$std.error <- as.numeric(results$std.error)
+results$ci_low <- as.numeric(results$ci_low)
+results$ci_high <- as.numeric(results$ci_high)
+results$statistic <- as.numeric(results$statistic)
+
+for (i in 1:nreps) {
+  Y <- true_betaB * G + rnorm(n)
+  mod <- lm(Y ~ G)
+  results[i, "pval"] <- tidy(mod)[2, "p.value"]
+  results[i, "term"] <- tidy(mod)[2, "term"]
+  results[i, "estimate"] <- tidy(mod)[2, "estimate"]
+  results[i, "std.error"] <- tidy(mod)[2, "std.error"]
+  results[i, "ci_low"] <- tidy(mod, conf.int = 0.95)[2, "conf.low"]
+  results[i, "ci_high"] <- tidy(mod, conf.int = 0.95)[2, "conf.high"]
+  results[i, "statistic"] <- tidy(mod)[2, "statistic"]
+}
+true_powerB <- sum(results$pval < T)/sum(!is.na(results$pval))
+
+# Again, the researchers at University B observe a p-value of about 0.052
+expB <- results %>% filter(pval<=p_approx & pval>p_approx-0.001) %>% arrange(desc(pval)) %>%  head(1)
+pander(expB, "Results of experiment at University B") 
+```
+
+## Results of the experiments from Universities A and B
+
+```{r results, message=FALSE, echo=FALSE}
+# Bind results from experiments A and B
+exp <- bind_rows(expA,expB)
+exp$University <- c("A","B")
+exp <- exp %>% select(University, everything()) %>% select(-i)
+# Store observed effect sizes from experiments A and B
+observed_betaA <- round(exp$estimate[1], 3)
+observed_betaB <- round(exp$estimate[2], 3)
+```
+
+Two experiments have now been carried out at the two universities, and very similar results have been obtained, each with a p-value that is approximately `r p_approx`. Each group writes up their results, and each of their reviewers requests a post hoc power estimate. 
+
+```{r pander_results1, echo=FALSE}
+pander(exp,"Results of simple linear regression examining the association between a two-allele genetic marker, G, and a quantitative trait, Y, for experiments at Universities A and B")
+```
+
+*The above table corresponds to Table 1 in the manuscript.*
+
+## A discussion of post hoc power
+
+So how should the requested post hoc power calculations be performed? 
+
+To do such a power calculation, a true effect size would need to be assumed.
+
+On what basis should the assumed true effect size be chosen?
+
+It is not clear what to assume, so a power curve based on analytical formulas could be created (as was done as part of the grant application for funding).
+
+As above, if it is assumed that the standard deviation of the predictor G is `r sigma.x` and that the marginal standard deviation of the outcome, the trait Y, is `r sigma.y`, then a two-sided simple linear regression test at the `r alpha` significance level, regressing outcome Y on predictor G, creates the estimated power graph (using the `power.SLR` function from the `powerMediation` R package). 
+
+If the true effect size is 0.35, then the estimated power would be `r round(power.table[which(power.table$beta==0.35),"power"],2)`. 
+
+```{r power2}
+# Redraw analytical power curve from above
+ggplot(data=power.table, aes(x=beta, y=power)) + geom_line() +  xlab("Effect Size") + ylab("Power") + ggtitle("Predicted statistical power curve for experiments at Universities A and B.")
+```
+
+*In the above figure, the black solid line represents analytically-derived estimates of predicted pre-study power as a function of assumed effect size while the black dotted line indicates the minimum effect size the study has 80% predicted power to detect.*
+
+### Observed vs. true power 
+
+This does not help us interpret the results though. While the results of experiments A and B are very similar, they came from distinct realities with different true effect sizes (set *a priori* above as part of the simulation of data for this study). Unfortunately, there is nothing in the statistical results that distinguishes the realities from which the results came. As experiments A and B were generated by simulation above, we know that the true effect sizes were `r true_betaA` for A and `r true_betaB` for B. This differs quite a bit from the observed effect sizes of `r observed_betaA` for A and `r observed_betaB` for B. 
+
+```{r results2, echo=FALSE}
+# Create a table to compare the observed and true effect sizes from experiments A and B
+exp2 <- NULL
+exp2 <- data.frame(exp[,4])
+names(exp2)[1] <- "Observed_Effect"
+exp2$True_Effect[1] <- true_betaA 
+exp2$True_Effect[2] <- true_betaB
+exp2$University <- c("A","B")
+exp2 <- exp2[, c(3, 1, 2)]
+```
+
+```{r pander_results2, echo=FALSE}
+pander(exp2,"Observed effect sizes and true effect sizes for experiments at Universities A and B")
+```
+
+Unfortunately, because true effect sizes can only be perfectly known if the data are simulated, post hoc power is regularly calculated using the observed effect size in the mathematical formula for computing predicted statistical power --- an approach that is conceptually and mathematically incorrect. Post hoc power is most often requested/performed in the case of statistically nonsignificant p-values as researchers/reviewers feel compelled to ask – “Perhaps the sample size just wasn’t large enough to detect an effect?” This is problematic though as there is a one-to-one relationship between the p-value and power. As such, large p-values will always translate to low observed power. Sure enough, the use of the observed effect sizes in this scenario suggests that the post hoc power was low for each experiment in this simulation (<0.60). 
+
+```{r results3}
+# Compute observed power using the observed effect sizes 
+observed_powerA <- round(power.SLR(n = n, lambda.a = observed_betaA, sigma.x = sigma.x, sigma.y = sigma.y, alpha = alpha, verbose = FALSE )$power, 3)
+observed_powerB <- round(power.SLR(n = n, lambda.a = observed_betaB , sigma.x = sigma.x, sigma.y = sigma.y, alpha = alpha, verbose = FALSE )$power, 3)
+```
+
+```{r results3b, echo=FALSE}
+# Add observed power to the table created above 
+exp2$Observed_Power[1] <-  observed_powerA
+exp2$Observed_Power[2] <-  observed_powerB
+```
+
+```{r pander_results3, echo=FALSE}
+pander(exp2,"Observed effect sizes, true effect sizes, and observed power for experiments at Universities A and B")
+```
+
+If these post hoc power calculations were to be presented in the published papers summarizing the results from Universities A and B, readers would arrive at similar conclusions about power for both experiments, but these conclusions would be wrong in different ways. Specifically, readers would conclude that experiment A was underpowered (post hoc power=`r observed_powerA`) when the true simulation-derived power was quite high (true power=`r true_powerA`) and that experiment B had greater power (but still low power; post hoc power=`r observed_powerB`) than its true simulation-derived power (true power=`r true_powerB`). 
+
+```{r results4, echo=FALSE}
+# Add true power to the table created above 
+exp2$True_Power[1] <- true_powerA
+exp2$True_Power[2] <- true_powerB
+```
+
+```{r pander_results4, echo=FALSE}
+pander(exp2,"Observed/true effect sizes and observed/true power for experiments at Universities A and B")
+```
+
+*The above table corresponds to Table 2 in the manuscript.*
+
+Note that these simulation-derived true power estimates are very similar to the analytical power estimates, as can be seen in the below figure.
+
+```{r plot, echo=FALSE}
+# Plot analytical power curve relative to the observed/true effect sizes for experiments A and B
+ggplot(data=power.table, aes(x=beta, y=power)) + geom_line()  + geom_vline(xintercept = true_betaA, color = "red") + geom_vline(xintercept = true_betaB, color = "blue") + geom_point(aes(x=exp$estimate[1], y=observed_powerA), colour="red") + geom_point(aes(x=exp$estimate[2], y=observed_powerB), colour="blue") +  geom_text(x=true_betaA - 0.01, y=0.95, label="A",color="red", size=5) + xlab("Effect Size") + ylab("Power") + geom_text(x=exp$estimate[1] + 0.011, y=observed_powerA, label="A",color="red", size=5) + geom_text(x=exp$estimate[2] - 0.011, y=observed_powerB, label="B",color="blue", size=5) + geom_vline(xintercept = p.80, color = "black", linetype="dotted") + geom_text(x=true_betaB - 0.01, y=0.95, label="B",color="blue", size=5) +  ggtitle("Predicted statistical power curve relative to observed and true effect \nsizes of experiments at Universities A and B.")
+```
+
+*The above figure corresponds to Figure 2 in the manuscript. The curved black line indicates analytically-derived estimates of predicted pre-study power as a function of assumed effect size. The vertical black dotted line indicates the predicted statistical power of 80% to detect a minimum effect size of `r p.80` or greater. The red and blue dots indicate the observed effect sizes for experiments A and B of `r observed_betaA` and `r observed_betaB`, respectively. The vertical red and blue lines indicate the true effect sizes set a priori as part of the simulation of data for experiments A and B of `r true_betaA` and `r true_betaB`, respectively.*
+
+## Conclusion: Post hoc power is not informative
+
+But does knowing the true power of experiment A was `r true_powerA` and the true power of experiment B was `r true_powerB` change the interpretation of the actual results that we obtained? Does seeing the estimated power graph change the interpretation of the actual results that we obtained?
+
+```{r pander_results5, echo=FALSE}
+pander(exp,"Results of the two experiments")
+```
+
+Under normal circumstances with real world (i.e., not simulated) data, after the experiments are done and the results are in hand, the power estimates do not lend any additional information regarding interpretation of the results because we have no data in hand that would inform us as to what reasonable true effect size we should assume for experiment A vs. what reasonable true effect size we should assume for experiment B. In fact, in this case, *a priori* we would have assumed that the true underlying effect sizes should be identical for both experiments as they are using genetically identical mice on identical diets. 
+
+In sum, researchers *should* use predicted statistical power for study planning but *should not* use post hoc power for explanation or interpretation of observed statistical results. We encourage authors and peer-reviewers to avoid using or requesting post hoc power calculations as they are *misleading*, they *do not add scientific value or assist researchers in data interpretation*, and are simply *not informative*.
+
+# Bibliography 
+
+```{r bib, echo=TRUE, include=FALSE}
+cite_packages()
+```
+
+R packages used:
+
+-> base (R Core Team 2020)
+
+-> rmarkdown (Allaire et al. 2020)
+
+-> knitr (Xie 2020)
+
+-> broom (Robinson and Hayes 2020)
+
+-> ggplot2 (Wickham 2016)
+
+-> grateful (Rodríguez-Sánchez and Hutchins 2020)
+
+-> pander (Daróczi and Tsegelskyi 2018)
+
+-> powerMediation (Qiu 2021)
+
+-> tidylog (Elbers 2020)
+
+-> tidyverse (Wickham et al. 2019)
+
+References
+
+Allaire, JJ, Yihui Xie, Jonathan McPherson, Javier Luraschi, Kevin Ushey, Aron Atkins, Hadley Wickham, Joe Cheng, Winston Chang, and Richard Iannone. 2020. Rmarkdown: Dynamic Documents for R. https://github.com/rstudio/rmarkdown.
+
+Daróczi, Gergely, and Roman Tsegelskyi. 2018. Pander: An R ’Pandoc’ Writer. https://CRAN.R-project.org/package=pander.
+
+Elbers, Benjamin. 2020. Tidylog: Logging for ’Dplyr’ and ’Tidyr’ Functions. https://CRAN.R-project.org/package=tidylog.
+
+Qiu, Weiliang. 2021. PowerMediation: Power/Sample Size Calculation for Mediation Analysis. https://CRAN.R-project.org/package=powerMediation.
+
+R Core Team. 2020. R: A Language and Environment for Statistical Computing. Vienna, Austria: R Foundation for Statistical Computing. https://www.R-project.org/.
+
+Robinson, David, and Alex Hayes. 2020. Broom: Convert Statistical Analysis Objects into Tidy Tibbles. https://CRAN.R-project.org/package=broom.
+
+Rodríguez-Sánchez, Francisco, and Shaurita D. Hutchins. 2020. Grateful: Facilitate Citation of R Packages. https://github.com/Pakillo/grateful.
+
+Wickham, Hadley. 2016. Ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York. https://ggplot2.tidyverse.org.
+
+Wickham, Hadley, Mara Averick, Jennifer Bryan, Winston Chang, Lucy D’Agostino McGowan, Romain François, Garrett Grolemund, et al. 2019. “Welcome to the tidyverse.” Journal of Open Source Software 4 (43): 1686. doi:10.21105/joss.01686.
+
+Xie, Yihui. 2020. Knitr: A General-Purpose Package for Dynamic Report Generation in R. https://yihui.org/knitr/.
+
+# Session Information
+
+```{r session}
+sessionInfo()
+```
