@@ -1,7 +1,6 @@
 ---
 title: "Code Repository for Post Hoc Power Simulation"
 author: "Lacey W. Heinsberg and Daniel E. Weeks"
-date: "`r format(Sys.time(), '%B %d, %Y, %R')`"
 output:
   github_document:
   html_preview: false
@@ -31,6 +30,11 @@ save_all <- function() {
 options(error = save_all)
 ```
 
+# Copyright information 
+
+Copyright 2022, University of Pittsburgh. All Rights Reserved.
+License: GPL-2 (https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+
 # Repository description 
 
 This repository contains R markdown analysis code that accompanies our paper "Post hoc Power is Not Informative" (@GeneticEpidemiology link to be added upon publication). 
@@ -40,6 +44,8 @@ The purpose of our commentary is to provide a heuristic explanation of why post 
 The purpose of this repository is to more fully document the details of our simulation through annotated code. 
 
 The code is presented as a single R Markdown file: `PosthocPower_Simulation.Rmd`. 
+
+If you have any questions or comments, please contact Lacey W. Heinsberg (law145@pitt.edu) or Daniel E. Weeks (weeks@pitt.edu). 
 
 # Dependencies 
 
@@ -62,7 +68,7 @@ library(broom)
 library(pander)
 library(powerMediation)
 library(ggplot2)
-library(grateful)
+library(grateful) # Install via devtools - devtools::install_github("https://github.com/Pakillo/grateful")
 ```
 
 ## Scenario
@@ -254,7 +260,7 @@ If the true effect size is 0.35, then the estimated power would be `r round(powe
 
 ```{r power2}
 # Redraw analytical power curve from above
-ggplot(data=power.table, aes(x=beta, y=power)) + geom_line() +  xlab("Effect Size") + ylab("Power") + ggtitle("Predicted statistical power curve for experiments at Universities A and B.")
+ggplot(data=power.table, aes(x=beta, y=power)) + geom_line() +  xlab("Effect Size") + ylab("Power") + ggtitle("Predicted statistical power curve for experiments at Universities A and B.") + geom_vline(xintercept = p.80, color = "black", linetype="dotted") + annotate("text", x=p.80 + 0.02, y=0.55, label=p.80, size=5) 
 ```
 
 *In the above figure, the black solid line represents analytically-derived estimates of predicted pre-study power as a function of assumed effect size while the black dotted line indicates the minimum effect size the study has 80% predicted power to detect.*

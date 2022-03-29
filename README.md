@@ -1,7 +1,11 @@
 Code Repository for Post Hoc Power Simulation
 ================
 Lacey W. Heinsberg and Daniel E. Weeks
-March 23, 2022, 15:59
+
+Copyright information
+=====================
+
+Copyright 2022, University of Pittsburgh. All Rights Reserved. License: GPL-2 (<https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html>)
 
 Repository description
 ======================
@@ -13,6 +17,8 @@ The purpose of our commentary is to provide a heuristic explanation of why post 
 The purpose of this repository is to more fully document the details of our simulation through annotated code.
 
 The code is presented as a single R Markdown file: `PosthocPower_Simulation.Rmd`.
+
+If you have any questions or comments, please contact Lacey W. Heinsberg (<law145@pitt.edu>) or Daniel E. Weeks (<weeks@pitt.edu>).
 
 Dependencies
 ============
@@ -38,7 +44,7 @@ library(broom)
 library(pander)
 library(powerMediation)
 library(ggplot2)
-library(grateful)
+library(grateful)  # Install via devtools - devtools::install_github('https://github.com/Pakillo/grateful')
 ```
 
 Scenario
@@ -425,7 +431,9 @@ If the true effect size is 0.35, then the estimated power would be 0.76.
 ``` r
 # Redraw analytical power curve from above
 ggplot(data = power.table, aes(x = beta, y = power)) + geom_line() + xlab("Effect Size") + 
-    ylab("Power") + ggtitle("Predicted statistical power curve for experiments at Universities A and B.")
+    ylab("Power") + ggtitle("Predicted statistical power curve for experiments at Universities A and B.") + 
+    geom_vline(xintercept = p.80, color = "black", linetype = "dotted") + annotate("text", 
+    x = p.80 + 0.02, y = 0.55, label = p.80, size = 5)
 ```
 
 ![](README_files/figure-markdown_github/power2-1.png)
@@ -687,15 +695,15 @@ sessionInfo()
     ##  [1] Rcpp_1.0.4.6     lubridate_1.7.9  lattice_0.20-41  clisymbols_1.2.0
     ##  [5] assertthat_0.2.1 digest_0.6.25    utf8_1.1.4       R6_2.4.1        
     ##  [9] cellranger_1.1.0 backports_1.1.8  reprex_0.3.0     evaluate_0.14   
-    ## [13] httr_1.4.2       pillar_1.4.4     rlang_0.4.12     readxl_1.3.1    
+    ## [13] httr_1.4.2       pillar_1.4.4     rlang_1.0.2      readxl_1.3.1    
     ## [17] rstudioapi_0.11  blob_1.2.1       rmarkdown_2.3    labeling_0.3    
     ## [21] munsell_0.5.0    compiler_4.0.1   modelr_0.1.8     xfun_0.15       
     ## [25] pkgconfig_2.0.3  htmltools_0.5.2  tidyselect_1.1.0 fansi_0.4.1     
     ## [29] crayon_1.3.4     dbplyr_1.4.4     withr_2.2.0      grid_4.0.1      
     ## [33] nlme_3.1-148     jsonlite_1.7.1   gtable_0.3.0     lifecycle_0.2.0 
     ## [37] DBI_1.1.0        magrittr_1.5     formatR_1.7      scales_1.1.1    
-    ## [41] cli_2.0.2        stringi_1.4.6    farver_2.0.3     renv_0.14.0     
-    ## [45] fs_1.4.1         xml2_1.3.2       ellipsis_0.3.1   generics_0.0.2  
-    ## [49] vctrs_0.3.1      tools_4.0.1      glue_1.4.1       hms_0.5.3       
+    ## [41] cli_2.0.2        stringi_1.4.6    renv_0.14.0      farver_2.0.3    
+    ## [45] fs_1.4.1         xml2_1.3.2       ellipsis_0.3.2   generics_0.0.2  
+    ## [49] vctrs_0.3.8      tools_4.0.1      glue_1.4.1       hms_0.5.3       
     ## [53] fastmap_1.1.0    yaml_2.2.1       colorspace_1.4-1 rvest_0.3.5     
     ## [57] haven_2.3.1
