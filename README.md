@@ -10,7 +10,9 @@ Copyright 2022, University of Pittsburgh. All Rights Reserved. License: GPL-2 (<
 Repository description
 ======================
 
-This repository contains R markdown analysis code that accompanies our paper "Post hoc Power is Not Informative" (@GeneticEpidemiology link to be added upon publication).
+This repository contains R markdown analysis code that accompanies our paper "Post hoc Power is Not Informative" (https://onlinelibrary.wiley.com/doi/abs/10.1002/gepi.22464).
+
+Heinsberg, L. W., & Weeks, D. E. (2022). Post hoc power is not informative. Genetic epidemiology, 10.1002/gepi.22464. Advance online publication. https://doi.org/10.1002/gepi.22464
 
 The purpose of our commentary is to provide a heuristic explanation of why post hoc power should not be used. To illustrate our point, we provide a detailed simulation study of two essentially identical research experiments hypothetically conducted in parallel at two separate universities. The simulation demonstrates that post hoc power calculations are misleading and simply not informative for data interpretation.
 
