@@ -14,6 +14,8 @@ This repository contains R markdown analysis code that accompanies our paper "Po
 
 Heinsberg, L. W., & Weeks, D. E. (2022). Post hoc power is not informative. Genetic epidemiology, 10.1002/gepi.22464. Advance online publication. https://doi.org/10.1002/gepi.22464
 
+To support accessibility of this paper until the 12 month embargo has been lifted, a self-archived version of the submitted (i.e., pre-peer reviewed) manuscript has been added to this GitHub repository `PostHocPower_SelfArchive_Pre-Review.docx` in accordance with Wiley's self-archiving policy. 
+
 The purpose of our commentary is to provide a heuristic explanation of why post hoc power should not be used. To illustrate our point, we provide a detailed simulation study of two essentially identical research experiments hypothetically conducted in parallel at two separate universities. The simulation demonstrates that post hoc power calculations are misleading and simply not informative for data interpretation.
 
 The purpose of this repository is to more fully document the details of our simulation through annotated code.
